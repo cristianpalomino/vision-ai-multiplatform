@@ -43,6 +43,6 @@ class ImageService extends ApiService {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((json) => ImageModel.fromJson(json)).toList();
     }
-    throw Exception('Failed to load images');
+    throw Exception('Failed to load images HTTP ${response.statusCode}');
   }
 }

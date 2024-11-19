@@ -5,7 +5,7 @@ import 'dart:convert';
 class AuthService extends ApiService {
   Future<String> login(String uuid, String password) async {
     final response = await http.post(
-      Uri.parse('$ApiService.baseUrl/user/login'),
+      Uri.parse('${ApiService.baseUrl}/user/login'),
       headers: headers,
       body: jsonEncode({
         'uuid': uuid,
