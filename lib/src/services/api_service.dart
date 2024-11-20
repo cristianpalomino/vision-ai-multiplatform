@@ -2,27 +2,52 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../utils/secure_storage.dart';
+import 'package:meta/meta.dart';
+
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  const ApiException(this.message, [this.statusCode]);
+
+  @override
+  String toString() => statusCode != null
+      ? 'ApiException: $message (Status: $statusCode)'
+      : 'ApiException: $message';
+}
 
 class ApiService {
   static const String baseUrl = 'http://localhost:3000/api';
 
   final _client = http.Client();
   final _cancelTokens = <String, CancelToken>{};
+  final _secureStorage = SecureStorage();
+
+  @protected
+  http.Client get client => _client;
 
   Future<Map<String, String>> get headers async {
-    final token = await SecureStorage().getToken();
+    final token = await _secureStorage.getToken();
+    if (token == null) {
+      throw const ApiException('No authentication token found');
+    }
+
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer $token',
     };
   }
 
   Future<Map<String, String>> get multipartHeaders async {
-    final token = await SecureStorage().getToken();
+    final token = await _secureStorage.getToken();
+    if (token == null) {
+      throw const ApiException('No authentication token found');
+    }
+
     return {
       'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer $token',
     };
   }
 
@@ -33,35 +58,55 @@ class ApiService {
     Map<String, dynamic>? body,
     Map<String, String>? queryParams,
     String? cancelKey,
+    bool requiresAuth = true,
   }) async {
     final uri =
         Uri.parse('$baseUrl/$path').replace(queryParameters: queryParams);
     final request = http.Request(method, uri);
 
-    if (body != null) {
-      request.headers.addAll(await headers);
-      request.body = jsonEncode(body);
-    }
-
-    final cancelToken = CancelToken();
-    if (cancelKey != null) {
-      _cancelTokens[cancelKey] = cancelToken;
-    }
-
     try {
+      request.headers.addAll(requiresAuth
+          ? await headers
+          : {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            });
+
+      if (body != null) {
+        request.body = jsonEncode(body);
+      }
+
+      final cancelToken = _createCancelToken(cancelKey);
       final streamedResponse = await _client.send(request);
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (cancelToken.isCancelled) {
+      if (cancelToken?.isCancelled ?? false) {
         throw const CancelledException();
       }
 
+      if (response.statusCode == 401 && requiresAuth) {
+        await _secureStorage.deleteToken();
+        throw const ApiException('Authentication failed', 401);
+      }
+
       return parser(response);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Request failed: $e');
     } finally {
       if (cancelKey != null) {
         _cancelTokens.remove(cancelKey);
       }
     }
+  }
+
+  CancelToken? _createCancelToken(String? key) {
+    if (key == null) return null;
+
+    final token = CancelToken();
+    _cancelTokens[key] = token;
+    return token;
   }
 
   void cancelRequest(String key) {

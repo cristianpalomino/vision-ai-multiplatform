@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/user_model.dart';
-import '../services/auth_service.dart';
-import '../providers/auth_provider.dart';
+import '../models/image_model.dart';
+import '../services/image_service.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   static const routeName = '/dashboard';
@@ -15,33 +14,33 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _isLoading = true;
-  User? _user;
+  List<ImageModel> _images = [];
   String? _error;
-  AuthService? _authService;
+  ImageService? _imageService;
 
   @override
   void initState() {
     super.initState();
-    _authService = AuthService();
-    _loadUserProfile();
+    _imageService = ImageService();
+    _loadImages();
   }
 
   @override
   void dispose() {
-    _authService?.dispose(); // Cleanup service
+    _imageService?.dispose();
     super.dispose();
   }
 
-  Future<void> _loadUserProfile() async {
+  Future<void> _loadImages() async {
     if (!mounted) return;
 
     try {
       setState(() => _isLoading = true);
-      final userProfile = await _authService?.getProfile();
+      final images = await _imageService?.getImages();
       if (!mounted) return;
 
       setState(() {
-        _user = userProfile;
+        _images = images ?? [];
         _error = null;
       });
     } catch (e) {
@@ -53,27 +52,77 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await ref.read(authProvider.notifier).logout();
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/login');
+  String _getStatusText(ImageStatus status) {
+    switch (status) {
+      case ImageStatus.PENDING:
+        return 'Pending';
+      case ImageStatus.PROCESSING:
+        return 'Processing';
+      case ImageStatus.COMPLETED:
+        return 'Completed';
+      case ImageStatus.FAILED:
+        return 'Failed';
+      default:
+        return 'Unknown';
     }
+  }
+
+  Color _getStatusColor(ImageStatus status) {
+    switch (status) {
+      case ImageStatus.PENDING:
+        return Colors.orange;
+      case ImageStatus.PROCESSING:
+        return Colors.blue;
+      case ImageStatus.COMPLETED:
+        return Colors.green;
+      case ImageStatus.FAILED:
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  void _showUploadOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Upload from Gallery'),
+            onTap: () {
+              Navigator.pop(context);
+              // TODO: Implement gallery upload
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.link),
+            title: const Text('Upload from URL'),
+            onTap: () {
+              Navigator.pop(context);
+              // TODO: Implement URL upload
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const Text('Images'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
+            icon: const Icon(Icons.person),
+            onPressed: () => Navigator.pushNamed(context, '/profile'),
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadUserProfile,
+        onRefresh: _loadImages,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
@@ -86,143 +135,86 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           style: const TextStyle(color: Colors.red),
                         ),
                         ElevatedButton(
-                          onPressed: _loadUserProfile,
+                          onPressed: _loadImages,
                           child: const Text('Retry'),
                         ),
                       ],
                     ),
                   )
-                : SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildProfileCard(),
-                        const SizedBox(height: 24),
-                        _buildStatsCard(),
-                        const SizedBox(height: 24),
-                        _buildRecentActivityCard(),
-                      ],
-                    ),
+                : _buildImageGrid(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showUploadOptions,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildImageGrid() {
+    if (_images.isEmpty) {
+      return const Center(
+        child: Text('No images yet. Upload some!'),
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: _images.length,
+      itemBuilder: (context, index) {
+        final image = _images[index];
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              Image.network(
+                image.storage.url,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(Icons.broken_image),
+                  );
+                },
+              ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Colors.black54,
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getStatusText(image.status),
+                        style: TextStyle(
+                          color: _getStatusColor(image.status),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${image.uuid.substring(0, 3)}...${image.uuid.substring(image.uuid.length - 3)}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-      ),
-    );
-  }
-
-  Widget _buildProfileCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Profile Information',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: const Text('UUID'),
-              subtitle: Text(_user?.uuid ?? 'N/A'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('Member Since'),
-              subtitle: Text(
-                _user?.createdAt?.toString() ?? 'N/A',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Usage Statistics',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('Images Processed', '0'),
-                _buildStatItem('Storage Used', '0 MB'),
-                _buildStatItem('API Calls', '0'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            ],
           ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecentActivityCard() {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Recent Activity',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Divider(),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 0, // Replace with actual activity count
-              itemBuilder: (context, index) {
-                return const ListTile(
-                  title: Text('No recent activity'),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
