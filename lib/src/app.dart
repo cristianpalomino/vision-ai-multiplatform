@@ -4,6 +4,7 @@ import 'package:vision_ai_multiplatform/src/screens/%20login_screen.dart';
 import 'package:vision_ai_multiplatform/src/screens/register_screen.dart';
 import 'package:vision_ai_multiplatform/src/screens/%20auth_wrapper.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/profile_screen.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
@@ -21,6 +22,7 @@ class App extends ConsumerWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/dashboard': (context) => const DashboardScreen(),
+        '/profile': (context) => const ProfileScreen(),
       },
     );
   }
