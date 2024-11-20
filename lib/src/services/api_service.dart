@@ -1,18 +1,24 @@
+import '../utils/secure_storage.dart';
+
 class ApiService {
   static const String baseUrl = 'http://localhost:3000/api';
 
-  final String? token;
+  final _storage = SecureStorage();
 
-  ApiService({this.token});
+  Future<Map<String, String>> get headers async {
+    final token = await _storage.getToken();
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
-  Map<String, String> get headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
-
-  Map<String, String> get multipartHeaders => {
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+  Future<Map<String, String>> get multipartHeaders async {
+    final token = await _storage.getToken();
+    return {
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 }
