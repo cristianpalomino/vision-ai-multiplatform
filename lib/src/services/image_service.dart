@@ -5,14 +5,12 @@ import 'package:vision_ai_multiplatform/src/models/image_model.dart';
 import 'package:vision_ai_multiplatform/src/services/api_service.dart';
 
 class ImageService extends ApiService {
-  ImageService({required String token}) : super(token: token);
-
   Future<void> uploadFile(File image) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('${ApiService.baseUrl}/user/images/upload'),
     )
-      ..headers.addAll(multipartHeaders)
+      ..headers.addAll(await multipartHeaders)
       ..files.add(await http.MultipartFile.fromPath('image', image.path));
 
     final response = await request.send();
@@ -24,7 +22,7 @@ class ImageService extends ApiService {
   Future<void> uploadUrl(String imageUrl) async {
     final response = await http.post(
       Uri.parse('${ApiService.baseUrl}/user/images/upload'),
-      headers: headers,
+      headers: await headers,
       body: jsonEncode({'url': imageUrl}),
     );
 
@@ -36,7 +34,7 @@ class ImageService extends ApiService {
   Future<List<ImageModel>> getImages() async {
     final response = await http.get(
       Uri.parse('${ApiService.baseUrl}/user/images'),
-      headers: headers,
+      headers: await headers,
     );
 
     if (response.statusCode == 200) {
