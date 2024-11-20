@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vision_ai_multiplatform/src/screens/%20login_screen.dart';
 import 'package:vision_ai_multiplatform/src/screens/register_screen.dart';
-import 'package:vision_ai_multiplatform/src/services/%20auth_wrapper.dart';
+import 'package:vision_ai_multiplatform/src/screens/%20auth_wrapper.dart';
 import 'screens/dashboard_screen.dart';
 
 class App extends ConsumerWidget {

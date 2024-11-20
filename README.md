@@ -26,7 +26,7 @@ Vision AI is a multiplatform application that allows users to:
   - Source type (URL/File)
   - Date range
   - Processing status
-  - Image digest
+  - Image digest (unique SHA256 hash identifier for container images)
 - Delete images
 - View detailed image analysis results
 

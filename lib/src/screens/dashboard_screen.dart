@@ -17,26 +17,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _isLoading = true;
   User? _user;
   String? _error;
+  AuthService? _authService;
 
   @override
   void initState() {
     super.initState();
+    _authService = AuthService();
     _loadUserProfile();
   }
 
+  @override
+  void dispose() {
+    _authService?.dispose(); // Cleanup service
+    super.dispose();
+  }
+
   Future<void> _loadUserProfile() async {
+    if (!mounted) return;
+
     try {
       setState(() => _isLoading = true);
-      final authService = AuthService();
-      // Assuming you'll add a getProfile method to AuthService
-      final userProfile = await authService.getProfile();
+      final userProfile = await _authService?.getProfile();
+      if (!mounted) return;
+
       setState(() {
         _user = userProfile;
         _error = null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = e.toString());
     } finally {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
